@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Virtual SEM — JEOL JSM-7610F 3D 실기 시뮬레이터</title>
+<style>
+:root{
+  --bg:#0b0d10; --panel:#151922; --panel2:#1d2330; --line:#2d3545;
+  --text:#e8edf6; --muted:#98a3b7; --accent:#36d7ff; --accent2:#7c9bff;
+  --warn:#ffd166; --bad:#ff5c7a; --good:#47e38a; --orange:#ffad42;
+}
+*{box-sizing:border-box}
+html,body{margin:0;min-height:100%;background:radial-gradient(circle at top,#182033 0,#0b0d10 45%,#07080a 100%);color:var(--text);font-family:Inter,Segoe UI,Apple SD Gothic Neo,Malgun Gothic,sans-serif}
+body{padding:14px}
+.app{max-width:1560px;margin:0 auto}
+
+header.top{background:linear-gradient(135deg,rgba(54,215,255,.16),rgba(255,173,66,.07));border:1px solid var(--line);border-radius:16px;padding:12px 18px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}
+h1{font-size:19px;margin:0;letter-spacing:-.02em}
+.sub{color:var(--muted);font-size:12px;margin-top:3px}
+.toplinks{display:flex;gap:8px}
+.toplinks a{color:#cfe9ff;text-decoration:none;border:1px solid #3a4558;background:#111722;padding:8px 14px;border-radius:10px;font-size:13px;font-weight:700}
+.toplinks a:hover{filter:brightness(1.2)}
+
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:14px;align-items:start}
+@media (max-width:1100px){.layout{grid-template-columns:1fr}}
+
+/* ---- SEM 뷰포트 ---- */
+.scope{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:12px;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+.viewportWrap{position:relative;background:#000;border-radius:10px;overflow:hidden;border:1px solid #222a38}
+#semCanvas{display:block;width:100%;aspect-ratio:4/3;image-rendering:auto}
+.databar{display:flex;align-items:center;gap:16px;background:#05070a;border:1px solid #202836;border-top:none;border-radius:0 0 10px 10px;padding:7px 14px;font-family:Consolas,Menlo,monospace;font-size:13px;color:#d7e3f5;flex-wrap:wrap}
+.databar .tag{color:#8fe9ff}
+.scalebar{display:flex;flex-direction:column;align-items:center;margin-left:auto}
+#scalebarLine{height:4px;background:#fff;border-radius:1px;width:80px;box-shadow:0 0 6px rgba(255,255,255,.4)}
+#scalebarLabel{font-size:11px;margin-top:2px;color:#fff}
+.brand{color:#5f7ca0;font-size:11px}
+
+.readouts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-top:12px}
+.ro{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 12px}
+.ro .k{font-size:11px;color:var(--muted);letter-spacing:.03em}
+.ro .v{font-size:15px;font-weight:800;margin-top:2px;font-family:Consolas,monospace}
+.ro .v.ok{color:var(--good)}
+.ro .v.bad{color:var(--bad)}
+.hintline{margin-top:10px;color:#7b8aa5;font-size:11.5px;line-height:1.5}
+
+/* ---- 우측 컬럼 ---- */
+.side{display:flex;flex-direction:column;gap:12px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+.panel h2{font-size:13px;margin:0 0 10px 0;color:var(--accent);text-transform:uppercase;letter-spacing:.06em}
+#chamberCanvas{width:100%;height:280px;border-radius:10px;background:#0a0d12;cursor:grab;touch-action:none}
+.banner{margin-top:8px;padding:7px 10px;border-radius:8px;font-size:12px;background:#10151f;border:1px solid #263047;color:#9fb0c8}
+.banner.info{border-color:#2a5c74;color:#8fe9ff;background:rgba(54,215,255,.07)}
+.banner.warn{border-color:#8a3a4c;color:#ffb3c1;background:rgba(255,92,122,.12);font-weight:700}
+
+.row{display:flex;align-items:center;gap:8px;margin:7px 0;flex-wrap:wrap}
+.row label{font-size:12.5px;color:#c3cde0;min-width:74px}
+.row output{font-family:Consolas,monospace;font-size:12px;color:#8fe9ff;min-width:64px;text-align:right}
+input[type=range]{flex:1;accent-color:var(--accent);min-width:80px}
+select{background:#111722;color:var(--text);border:1px solid #3a4558;border-radius:8px;padding:5px 8px;font-size:12.5px}
+.btn{border:1px solid #3a4558;background:#111722;color:#cfd8e9;padding:7px 12px;border-radius:9px;font-weight:700;font-size:12.5px;cursor:pointer}
+.btn:hover{filter:brightness(1.2)}
+.btn.active{background:linear-gradient(180deg,#5ee3ff,#20a7ca);color:#001018;border-color:#6ee7ff}
+.btn.warnbtn{border-color:#7a5a2a;color:#ffd166}
+.btngroup{display:flex;gap:6px;flex-wrap:wrap}
+.det{width:calc(50% - 3px)}
+#detectors{display:flex;gap:6px;flex-wrap:wrap}
+.led{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;background:#1a212e;border:1px solid #3a4558;color:#98a3b7}
+.led.on{background:rgba(71,227,138,.15);border-color:#2f7a4d;color:var(--good);font-weight:800}
+.checks{display:flex;align-items:center;gap:8px;font-size:12.5px;color:#c3cde0;margin:6px 0}
+.samplebtns{display:flex;gap:6px;flex-wrap:wrap}
+.samplebtns .btn{font-size:11.5px;padding:6px 9px}
+#sampleDesc{font-size:11.5px;color:#8ea0bd;margin-top:8px;line-height:1.5}
+.axisname{display:inline-block;width:20px;font-weight:800;color:var(--accent2)}
+
+.toast{position:fixed;left:50%;bottom:26px;transform:translateX(-50%) translateY(120%);background:#152030;border:1px solid #2a5c74;color:#cfe9ff;padding:11px 20px;border-radius:12px;font-size:13.5px;font-weight:600;transition:transform .25s;z-index:99;max-width:min(640px,90vw);box-shadow:0 10px 40px rgba(0,0,0,.5)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.warn{border-color:#8a3a4c;color:#ffc9d3;background:#241018}
+
+footer{margin-top:16px;color:#5f7ca0;font-size:11.5px;text-align:center;line-height:1.6}
+footer a{color:#8fe9ff}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div>
+      <h1>🔬 Virtual SEM <span style="color:var(--accent)">·</span> JEOL JSM-7610F 3D 실기 시뮬레이터</h1>
+      <div class="sub">커스텀 WebGL 물리 렌더링 엔진 — 5축 유센트릭 스테이지 · RBEI 인터록 · 초점심도(DOF) · SE/BSE 신호 모델</div>
+    </div>
+    <div class="toplinks">
+      <a href="theory.html">📚 이론 교재 열기</a>
+      <a href="https://github.com/Piberry-lab/virtual-sem" target="_blank" rel="noopener">GitHub</a>
+    </div>
+  </header>
+
+  <div class="layout">
+    <!-- ===== SEM 화면 ===== -->
+    <section class="scope">
+      <div class="viewportWrap">
+        <canvas id="semCanvas"></canvas>
+      </div>
+      <div class="databar">
+        <span id="dbKv" class="tag">15.0 kV</span>
+        <span id="dbWd">WD 10.0mm</span>
+        <span id="dbMag">×500</span>
+        <span id="dbDet">LED</span>
+        <span id="dbScan">TV</span>
+        <div class="scalebar"><div id="scalebarLine"></div><div id="scalebarLabel">50 µm</div></div>
+        <span class="brand">JSM-7610F&nbsp;SIM</span>
+      </div>
+
+      <div class="readouts">
+        <div class="ro"><div class="k">수렴 반각 α = r<sub>ap</sub>/WD</div><div class="v" id="roAlpha">–</div></div>
+        <div class="ro"><div class="k">초점심도 DOF = 0.2mm/(M·α)</div><div class="v" id="roDof">–</div></div>
+        <div class="ro"><div class="k">프로브 지름 (수차 합성)</div><div class="v" id="roProbe">–</div></div>
+        <div class="ro"><div class="k">픽셀 크기 (시료면)</div><div class="v" id="roPixel">–</div></div>
+        <div class="ro"><div class="k">중심 디포커스 Δz</div><div class="v" id="roDefocus">–</div></div>
+        <div class="ro"><div class="k">SNR = √N (픽셀당)</div><div class="v" id="roSnr">–</div></div>
+      </div>
+      <div class="hintline">
+        💡 <b>DOF 실험</b>: 시료를 <b>필러 어레이</b>로 바꾸고 틸트 45°, ×2,000에서 조리개를 30µm↔100µm로 바꿔보세요. 초점 밴드(챔버 뷰 하늘색 판) 두께가 변하며 화면 위·아래 흐림이 달라집니다.
+        <b>RBEI 실험</b>: WD 5mm에서 RBEI 삽입을 시도해 보고, WD 8mm·틸트 0°에서 삽입 후 틸트를 올려 인터록 한계를 확인하세요. 키보드: ←→↑↓(X/Y) PgUp/Dn(Z) T/G(틸트)
+      </div>
+    </section>
+
+    <!-- ===== 우측: 챔버 + 콘솔 ===== -->
+    <aside class="side">
+      <div class="panel">
+        <h2>시료실 (Chamber) — 드래그 회전 · 휠 줌</h2>
+        <canvas id="chamberCanvas"></canvas>
+        <div id="interlockBanner" class="banner">인터록 정상</div>
+      </div>
+
+      <div class="panel">
+        <h2>검출기 · RBEI</h2>
+        <div id="detectors"></div>
+        <div class="row" style="margin-top:10px">
+          <button class="btn warnbtn" id="btnRBEI">RBEI 삽입</button>
+          <span class="led" id="rbeiState">인출됨</span>
+          <span style="font-size:11px;color:#7b8aa5">환형 BSE 검출기 — 폴피스 직하 삽입식</span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>스테이지 (5축 유센트릭)</h2>
+        <div class="row"><label><span class="axisname">X</span>−35~35</label><input type="range" id="stX" min="-35" max="35" step="0.1"><output id="stXOut"></output></div>
+        <div class="row"><label><span class="axisname">Y</span>−25~25</label><input type="range" id="stY" min="-25" max="25" step="0.1"><output id="stYOut"></output></div>
+        <div class="row"><label><span class="axisname">Z</span>WD 1~40</label><input type="range" id="stZ" min="1" max="40" step="0.1"><output id="stZOut"></output></div>
+        <div class="row"><label><span class="axisname">T</span>−5~70°</label><input type="range" id="stT" min="-5" max="70" step="0.5"><output id="stTOut"></output></div>
+        <div class="row"><label><span class="axisname">R</span>0~360°</label><input type="range" id="stR" min="0" max="360" step="1"><output id="stROut"></output></div>
+        <div class="row">
+          <button class="btn" id="btnHome">원점 복귀</button>
+          <span id="roStage" style="font-size:11px;color:#8ea0bd;font-family:Consolas,monospace"></span>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>전자광학 (Column)</h2>
+        <div class="row"><label>가속전압</label><input type="range" id="kv" min="0.5" max="30" step="0.1"><output id="kvOut"></output></div>
+        <div class="row"><label>프로브 전류</label><select id="probeCurrent"></select>
+          <label class="checks" style="min-width:0"><input type="checkbox" id="gb"> GENTLEBEAM</label></div>
+        <div class="row"><label>대물 조리개</label>
+          <div class="btngroup">
+            <button class="btn" data-ap="0">30µm</button>
+            <button class="btn active" data-ap="1">50µm</button>
+            <button class="btn" data-ap="2">70µm</button>
+            <button class="btn" data-ap="3">100µm</button>
+          </div>
+        </div>
+        <div class="row"><label>FOCUS 조동</label><input type="range" id="focusCoarse" min="0.5" max="42" step="0.05"><output id="focusCoarseOut"></output></div>
+        <div class="row"><label>FOCUS 미동</label><input type="range" id="focusFine" min="-0.2" max="0.2" step="0.001"><output id="focusFineOut"></output></div>
+        <div class="row"><button class="btn" id="btnAF">AUTO FOCUS</button><span style="font-size:11px;color:#7b8aa5">초점면 = 하늘색 판 (챔버 뷰)</span></div>
+        <div class="row"><label>STIGMA X</label><input type="range" id="stigX" min="-1" max="1" step="0.01"><output id="stigXOut"></output></div>
+        <div class="row"><label>STIGMA Y</label><input type="range" id="stigY" min="-1" max="1" step="0.01"><output id="stigYOut"></output></div>
+      </div>
+
+      <div class="panel">
+        <h2>주사 (Scan) · 배율 · 영상</h2>
+        <div class="row"><label>배율</label><input type="range" id="mag" min="0" max="1" step="0.001"><output id="magOut"></output></div>
+        <div class="row">
+          <div class="btngroup">
+            <button class="btn" data-mag="100">×100</button>
+            <button class="btn" data-mag="1000">×1k</button>
+            <button class="btn" data-mag="10000">×10k</button>
+            <button class="btn" data-mag="100000">×100k</button>
+          </div>
+        </div>
+        <div class="row">
+          <div class="btngroup">
+            <button class="btn active" data-scan="0">TV</button>
+            <button class="btn" data-scan="1">SLOW1</button>
+            <button class="btn" data-scan="2">SLOW2</button>
+            <button class="btn" data-scan="3">PHOTO</button>
+            <button class="btn" id="btnFreeze">FREEZE</button>
+            <button class="btn" id="btnSave">💾 저장</button>
+          </div>
+        </div>
+        <div class="row"><label>밝기</label><input type="range" id="brightness" min="-0.6" max="0.6" step="0.01"></div>
+        <div class="row"><label>명암</label><input type="range" id="contrast" min="0.2" max="6" step="0.05"></div>
+        <div class="row"><label>감마</label><input type="range" id="gamma" min="0.4" max="2.4" step="0.05">
+          <button class="btn" id="btnACB">ACB 자동</button></div>
+      </div>
+
+      <div class="panel">
+        <h2>시료 (Specimen)</h2>
+        <div class="samplebtns">
+          <button class="btn active" data-sample="snballs">Sn 볼</button>
+          <button class="btn" data-sample="particles">다물질 입자</button>
+          <button class="btn" data-sample="pillars">Si 필러</button>
+          <button class="btn" data-sample="fracture">파단면</button>
+          <button class="btn" data-sample="chip">IC 칩</button>
+        </div>
+        <label class="checks"><input type="checkbox" id="charging"> 비전도성 시료 (미코팅 — 차징 발생)</label>
+        <div id="sampleDesc"></div>
+      </div>
+    </aside>
+  </div>
+
+  <footer>
+    교육용 시뮬레이터 — JEOL JSM-7610F 공개 사양 기반 (스테이지 X70/Y50/Z1–40mm·T−5~70°·R360°, 0.1–30kV, ×25–1,000,000).
+    RBEI 인터록 수치는 실측 매뉴얼값이 아닌 기하 모델 추정입니다. 물리 모델: δ∝sec θ · Reuter η(Z) · DOF=0.2mm/(M·α) · SNR=√N.
+    <a href="theory.html">이론 교재</a> · <a href="https://github.com/Piberry-lab/virtual-sem" target="_blank" rel="noopener">소스 (GitHub)</a>
+  </footer>
+</div>
+<div id="toast" class="toast"></div>
+<script type="module" src="app.js"></script>
+</body>
+</html>
